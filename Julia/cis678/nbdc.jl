@@ -1,5 +1,10 @@
 #!/usr/bin/env julia
 
+#=
+# machine learning:
+# Naive Bayesian document classifier
+=#
+
 using DataFrames, StatPlots
 
     #=
