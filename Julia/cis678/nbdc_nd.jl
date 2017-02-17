@@ -1,8 +1,7 @@
 #!/usr/bin/env julia
 
-using DataFrames
-import StatsBase.countmap,
-       StatsBase.sample
+import  StatsBase: countmap, sample
+import  DataFrames: DataFrame, writetable
 
     #=
     # initialize training dataset, global vocabulary
@@ -63,29 +62,29 @@ end
     # output: line index (Dictionary)
     =#
 function lid(dst::String)
-cidx = classlist()
-if dst == "train"
-    doccts = [ 480, 584, 572, 590, 578,
-               593, 585, 594, 598, 597,
-               600, 595, 591, 594, 593,
-               598, 545, 564, 465, 377 ]
-elseif dst == "test"
-    doccts = [ 319, 389, 393, 392, 385,
-               392, 390, 395, 398, 397,
-               399, 396, 393, 396, 394,
-               398, 364, 376, 310, 251 ]
-end
-offs = Matrix{Int}(0, 2)
-i = 0
-j = i
-k = 1
-for cls in cidx
-    i = i + doccts[k]
-    k += 1
-    offs = vcat(offs, [j+1 i])
+    cidx = classlist()
+    if dst == "train"
+        doccts = [ 480, 584, 572, 590, 578,
+                   593, 585, 594, 598, 597,
+                   600, 595, 591, 594, 593,
+                   598, 545, 564, 465, 377 ]
+    elseif dst == "test"
+        doccts = [ 319, 389, 393, 392, 385,
+                   392, 390, 395, 398, 397,
+                   399, 396, 393, 396, 394,
+                   398, 364, 376, 310, 251 ]
+    end
+    offs = Matrix{Int}(0, 2)
+    i = 0
     j = i
-end
-return Dict(cidx[k] => offs[k, :]' for k = 1:length(cidx))
+    k = 1
+    for cls in cidx
+        i = i + doccts[k]
+        k += 1
+        offs = vcat(offs, [j+1 i])
+        j = i
+    end
+    return Dict(cidx[k] => offs[k, :]' for k = 1:length(cidx))
 end
 
     #=
@@ -98,14 +97,14 @@ end
 function classtext(ds::Vector{String},
                     f::Int,
                     l::Int)
-t = Array{String}(1, 0)
-chunk = ds[f:l]
-for doc in chunk
-    row = split(doc)
-    # s = row[1:end]
-    # t = hcat(t, reshape(s, 1, length(s)))
-    t = hcat(t, reshape(row, 1, length(row)))
-end
+    t = Array{String}(1, 0)
+    chunk = ds[f:l]
+    for doc in chunk
+        row = split(doc)
+        # s = row[1:end]
+        # t = hcat(t, reshape(s, 1, length(s)))
+        t = hcat(t, reshape(row, 1, length(row)))
+    end
     return t
 end
 
@@ -117,19 +116,19 @@ end
     =#
 function cwd(ctxt::Matrix{String},
               voc::Vector{SubString{String}})
-wd = Dict{String, Real}()
-n = length(ctxt)
-map = countmap(ctxt)
-for word in voc
-    if haskey(map, word)
-        nk = map[word]
-    else
-        nk = 0
+    wd = Dict{String, Real}()
+    n = length(ctxt)
+    map = countmap(ctxt)
+    for word in voc
+        if haskey(map, word)
+            nk = map[word]
+        else
+            nk = 0
+        end
+        ewo = (nk + 1) / (n + length(voc))
+        wd["$word"] = ewo
     end
-    ewo = (nk + 1) / (n + length(voc))
-    wd["$word"] = ewo
-end
-return wd
+    return wd
 end
 
     #=
@@ -203,7 +202,7 @@ function validate(fn::String,
 end
 
     #=
-    # classify a document, given a word probability dataframe
+    # classify a document, given a word probability dictionary
     # input: doc - document to classify (Vector{String})
     #         wd - words dictionary (Dict)
     # output: predicted classname - index of the maximum probability class
