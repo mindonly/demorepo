@@ -1,0 +1,231 @@
+#!/usr/local/bin/julia
+
+abstract Node
+abstract Layer
+
+type Edge
+    weight::Real
+    source::Node
+    target::Node
+
+    function Edge(wt::Real, src::Node, dst::Node)
+        return new(wt, src, dst)
+    end
+end
+
+type InputNode <: Node
+    index::Int
+    value::Real
+    outedges::Vector{Edge}
+
+    function InputNode(idx::Int, val::Real)
+        return new(idx, val, Vector{Edge}())
+    end
+end
+
+type BiasNode <: Node
+    index::Int
+    value::Real
+    outedges::Vector{Edge}
+
+    function BiasNode(idx::Int, val::Real)
+        return new(idx, val, Vector{Edge}())
+    end
+end
+
+type HiddenNode <: Node
+    index::Int
+    output::Real
+    inedges::Vector{Edge}
+    outedges::Vector{Edge}
+
+    function HiddenNode(idx::Int, val::Real)
+        return new(idx, val, Vector{Edge}(), Vector{Edge}())
+    end
+end
+
+type OutputNode <: Node
+    index::Int
+    output::Real
+    inedges::Vector{Edge}
+
+    function OutputNode(idx::Int)
+        return new(idx, 0, Vector{Edge}())
+    end
+end
+
+type InputLayer <: Layer
+    nodes::Vector{InputNode}
+    bn::BiasNode
+
+    function InputLayer(nnodes::Int)
+        nodev = Vector{InputNode}()
+        for i = 1:nnodes
+            push!(nodev, InputNode(i, 0))
+        end
+        bnode = BiasNode(length(nodev) + 1, 1)
+
+        return new(nodev, bnode)
+    end
+end
+
+type HiddenLayer <: Layer
+    nodes::Vector{HiddenNode}
+    bn::BiasNode
+
+    function HiddenLayer(nnodes::Int, offset::Int)
+        nodev = Vector{HiddenNode}()
+        for i = (offset + 1):(offset + nnodes)
+            push!(nodev, HiddenNode(i, 0))
+        end
+        bnode = BiasNode(offset + length(nodev) + 1, 1)
+
+        return new(nodev, bnode)
+    end
+end
+
+type OutputLayer <: Layer
+    nodes::Vector{OutputNode}
+
+    function OutputLayer(nnodes::Int, offset::Int)
+        nodev = Vector{OutputNode}()
+        for i = (offset + 1):(offset + nnodes)
+            push!(nodev, OutputNode(i))
+        end
+
+        return new(nodev)
+    end
+end
+
+type NeuralNet
+    nodes::Vector{Node}
+    edges::Vector{Edge}
+
+    function NeuralNet(inodes::Int, hnodes::Int, onodes::Int)
+        nodev = Vector{Node}()
+        edgev = Vector{Edge}()
+
+            # set up neural net layers
+        IL = InputLayer(inodes)
+        offset = length(IL.nodes) + 1
+        HL = HiddenLayer(hnodes, offset)
+        offset += length(HL.nodes) + 1
+        OL = OutputLayer(onodes, offset)
+
+            # attach input layer edges
+        for inode in IL.nodes
+            for hnode in HL.nodes
+                edge = Edge(0, inode, hnode)
+                push!(inode.outedges, edge)
+                push!(hnode.inedges, edge)
+                push!(edgev, edge)
+            end
+        end
+
+            # attach input layer bias node edges
+        for hnode in HL.nodes
+            edge = Edge(0, IL.bn, hnode)
+            push!(IL.bn.outedges, edge)
+            push!(hnode.inedges, edge)
+            push!(edgev, edge)
+        end
+
+            # attach hidden layer edges
+        for hnode in HL.nodes
+            for onode in OL.nodes
+                edge = Edge(0, hnode, onode)
+                push!(hnode.outedges, edge)
+                push!(onode.inedges, edge)
+                push!(edgev, edge)
+            end
+        end
+
+            # attach hidden layer bias node edges
+        for onode in OL.nodes
+            edge = Edge(0, HL.bn, onode)
+            push!(HL.bn.outedges, edge)
+            push!(onode.inedges, edge)
+            push!(edgev, edge)
+        end
+
+        weightv = [-0.05, -0.025, -0.01, 0, 0.01, 0.025, 0.05]
+        for edge in edgev
+            edge.weight = rand(weightv)
+        end
+
+        for node in IL.nodes
+            push!(nodev, node)
+        end
+        push!(nodev, IL.bn)
+
+        for node in HL.nodes
+            push!(nodev, node)
+        end
+        push!(nodev, HL.bn)
+
+        for node in OL.nodes
+            push!(nodev, node)
+        end
+
+        return new(nodev, edgev)
+    end
+end
+
+type DSet
+    numcls::Int
+    numattr::Int
+    numobs::Int
+    classes::Vector{String}
+    attrs::Dict{String, Tuple}
+    obs::Vector{String}
+
+    #=
+    # DSet constructor
+   =#
+    function DSet(fn::String)
+        f = open(fn)
+        lines = readlines(f)
+
+        meta = Vector{Int}()
+        cats = Vector{String}()
+        feat = Vector{String}()
+        vals = Vector{Tuple}()
+        data = Vector{String}()
+
+        for line in lines
+            line = split(line, ",")
+            if length(line) == 1 && line[1] != "\n"
+                item = parse(Int, line[1])
+                push!(meta, item)
+            end
+        end
+
+        line2 = split(lines[2], ",")
+        for i = 1:length(line2)
+            line2[i] = replace(line2[i], r"(\r\n|\r|\n)", "")
+            push!(cats, line2[i])
+        end
+
+        lastattr = 4 + meta[2] - 1      # 4 = 4th line
+        for line in lines[4:lastattr]
+            line = split(line, ",")
+            push!(feat, line[1])
+            if contains(line[2], "real")
+                push!(vals, ("continuous", 0))
+            else
+                push!(vals, ("categorical", parse(Int, line[2])))
+            end
+        end
+        attr = OrderedDict{String, Tuple}(zip(feat, vals))
+
+        firstdata = 3 + meta[2] + 2     # 3 = 3rd line
+        for line in lines[firstdata:end]
+            if length(line) > 1
+                line = replace(line, r"(\r\n|\r|\n)", "")
+                push!(data, line)
+            end
+        end
+
+        new(meta[1], meta[2], meta[3], cats, attr, data)
+    end
+end

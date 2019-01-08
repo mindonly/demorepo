@@ -1,0 +1,101 @@
+#!/usr/local/bin/julia
+
+using DataFrames
+import DataStructures.OrderedDict
+import StatsBase: countmap, sample
+
+include("ANNtypes.jl")
+
+#=
+ = linear discriminant threshold
+ =#
+function lindisc(sigma::Real)
+    if sigma > 0
+        return 1
+    else
+        return 0
+    end
+end
+
+    #=
+    sigmoid
+    =#
+function sigmoid(sigma::Real)
+    return 1 / (1 + e^(-sigma))
+end
+
+    #=
+    derivative of sigmoid
+    =#
+function dsigmoid(y::Real)
+    return y * (1 - y)
+end
+
+    #=
+    derivative of tanh
+    =#
+function dtanh(y)
+    return 1 - y * y
+end
+
+function main()
+    NN = NeuralNet(2, 2, 1)
+    return NN
+end
+
+    #=
+    tutorial example
+    =#
+function tutorial()
+    NN = NeuralNet(2, 2, 1)
+
+    # initialize weights
+    NN.edges[1].weight = 1
+    NN.edges[2].weight = -1
+    NN.edges[3].weight = 0.5
+    NN.edges[4].weight = 2
+    NN.edges[5].weight = 1
+    NN.edges[6].weight = 1
+    NN.edges[7].weight = 1.5
+    NN.edges[8].weight = -1
+    NN.edges[9].weight = 1
+
+    return NN
+end
+
+    #=
+    return input node count for neural net 'nn'
+    =#
+function inodect(nn::NeuralNet)
+    inct = 0
+    for node in nn.nodes
+        if isa(node, InputNode)
+            inct += 1
+        end
+    end
+
+    return inct
+end
+
+function feedforward(nn::NeuralNet, ob::Vector{Int})
+    inct = inodect(nn)
+    if length(ob) != inct
+        error("wrong number of inputs!")
+        println("input seems ok")
+    end
+
+    for i = 1:inct
+        nn.nodes[i].value = ob[i]
+    end
+end
+
+#=
+ experiment1: categorical coding: dummy vs. every category
+ experiment2: scaling? (mean 0, unit variance; pg. 285)
+ experiment3: initial weight values range
+ experiment4: batch vs. online?
+ experiment5: adaptive learning rate?
+ experiment6: single vs. batch vs. minibatch
+=#
+
+@time NN = tutorial()
